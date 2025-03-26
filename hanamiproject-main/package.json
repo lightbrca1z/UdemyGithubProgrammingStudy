@@ -1,13 +1,5 @@
 {
-  "devDependencies": {
-    "@types/react": "^19.0.12",
-    "@types/react-dom": "^19.0.4"
-  },
-  "dependencies": {
-    "react-icons": "^5.5.0"
-  }
-}
-  "name": "hanami-project",
+  "name": "hanamiproject",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -19,7 +11,7 @@
   "dependencies": {
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "next": "15.2.4"
+    "next": "15.2.0"
   },
   "devDependencies": {
     "typescript": "^5",
@@ -27,7 +19,9 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@tailwindcss/postcss": "^4",
-    "tailwindcss": "^4"
+    "tailwindcss": "^4",
+    "eslint": "^9",
+    "eslint-config-next": "15.2.0",
+    "@eslint/eslintrc": "^3"
   }
 }
-
