@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>TodoApp</title>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    loadTasks();
+
+    document.getElementById("todoForm").addEventListener("submit", function (event) {
+        event.preventDefault(); // フォームのデフォルト動作（リロード）を防ぐ
+
+        let taskInput = document.getElementById("task");
+        let taskText = taskInput.value.trim();
+        if (taskText === "") {
+            alert("タスクを入力してください");
+            return;
+        }
+
+        // タスクを送信
+        fetch("./Todo222", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: "task=" + encodeURIComponent(taskText)
+        })
+        .then(response => response.json())
+        .then(tasks => {
+            taskInput.value = ""; // 入力欄をクリア
+            updateTaskList(tasks); // タスクリストを更新
+        })
+        .catch(error => {
+            console.error("Error:", error);
+            alert("サーバーとの通信に失敗しました。もう一度試してください。");
+        });
+    });
+
+    document.getElementById("resetButton").addEventListener("click", resetTasks);
+});
+
+// タスクリストを取得
+function loadTasks() {
+    fetch("./Todo222")
+        .then(response => response.json())
+        .then(tasks => updateTaskList(tasks))
+        .catch(error => {
+            console.error("Error:", error);
+            alert("タスクの読み込みに失敗しました。");
+        });
+}
+
+// タスクリストを更新
+function updateTaskList(tasks) {
+    let taskList = document.getElementById("taskList");
+    taskList.innerHTML = ""; // リストをクリア
+
+    tasks.forEach(task => {
+        let li = document.createElement("li");
+        li.textContent = task.task;
+        taskList.appendChild(li);
+    });
+}
+
+// タスクをリセット
+function resetTasks() {
+    if (!confirm("本当にタスクリストをリセットしますか？")) return;
+
+    fetch("./TodoReset", {
+        method: "POST"
+    })
+    .then(response => response.json())
+    .then(() => {
+        updateTaskList([]); // タスクリストをクリア
+        alert("タスクをリセットしました。");
+    })
+    .catch(error => {
+        console.error("Error:", error);
+        alert("タスクのリセットに失敗しました。");
+    });
+}
+</script>
+</head>
+<body>
+<h1>TodoApp</h1>
+<form id="todoForm">
+  <label for="task">タスク入力:</label><br>
+  <textarea id="task" name="task" rows="4" cols="50"></textarea><br>
+  <input type="submit" value="送信">
+</form>
+
+<h2>タスクリスト</h2>
+<ul id="taskList"></ul>
+
+<!-- タスクリセットボタン -->
+<button id="resetButton">タスクリストをリセット</button>
+
+</body>
+</html>
