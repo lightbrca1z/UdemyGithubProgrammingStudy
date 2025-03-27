@@ -31,7 +31,7 @@ export default function Home() {
     }
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (task.trim() === "") return;
 
@@ -47,7 +47,7 @@ export default function Home() {
     }
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id: number) => {
     const { error } = await supabase
       .from("todos")
       .delete()

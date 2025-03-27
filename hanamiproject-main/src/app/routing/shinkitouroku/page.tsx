@@ -1,21 +1,66 @@
 'use client';
 
 import Image from 'next/image';
+import { useState } from 'react';
+
+import { twMerge } from "tailwind-merge";
+
+import { clsx } from "clsx";
+
+interface FormData {
+  kubun: string;
+  kankei: string;
+  tanto: string;
+  tel: string;
+  mobile: string;
+  fax: string;
+  email: string;
+  area: string;
+  address: string;
+  memo: string;
+}
 
 export default function RoutingFormPage() {
+  const [formData, setFormData] = useState<FormData>({
+    kubun: '',
+    kankei: '',
+    tanto: '',
+    tel: '',
+    mobile: '',
+    fax: '',
+    email: '',
+    area: '',
+    address: '',
+    memo: ''
+  });
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    // ここにフォーム送信のロジックを実装
+    console.log('Form submitted:', formData);
+  };
+
   return (
     <div className="min-h-screen bg-green-100 p-6 sm:p-12 font-sans">
       {/* ヘッダー */}
       <header className="w-full flex flex-col sm:flex-row justify-between items-center max-w-6xl mx-auto">
         <div className="text-3xl font-bold text-purple-600">IT就労 ビズウェル</div>
         <nav className="flex space-x-4 text-pink-700 text-sm sm:text-base mt-4 sm:mt-0">
-          <a href="/">ホーム</a>
-          <a href="/routing/tanto">担当者一覧</a>
-          <a href="/routing/kankei">関係機関一覧</a>
-          <a href="/routing/kubun">区分一覧</a>
-          <a href="/routing/area">エリア一覧</a>
-          <a href="/routing/logout">ログアウト</a>
-          <a href="/routing/shinkitouroku">新規登録</a>
+        <a href="/">ホーム</a>
+        <a href="/routing/tanto">担当者一覧</a>
+        <a href="/routing/kankei">関係機関一覧</a>
+        <a href="/routing/kubun">区分一覧</a>
+        <a href="/routing/area">エリア一覧</a>
+        <a href="/routing/logout">ログアウト</a>
+        <a href="/routing/shinkitouroku">新規登録</a>
         </nav>
       </header>
 
@@ -36,19 +81,19 @@ export default function RoutingFormPage() {
         {/* 入力フォーム */}
         <div className="bg-purple-900 text-white p-6 rounded-xl w-full lg:w-2/3">
           <h2 className="bg-purple-400 text-center text-xl font-bold py-2 rounded-t-xl mb-4">入力フォーム</h2>
-          <form className="space-y-4 text-sm">
+          <form onSubmit={handleSubmit} className="space-y-4 text-sm">
             {[
-              ['区分入力', true],
-              ['関係機関名', true],
-              ['担当者名', true],
-              ['TEL', true],
-              ['携帯', false],
-              ['FAX', false],
-              ['メール', true],
-              ['エリア', true],
-              ['住所', false],
-              ['備考', false],
-            ].map(([label, required], index) => (
+              ['kubun', '区分入力', true],
+              ['kankei', '関係機関名', true],
+              ['tanto', '担当者名', true],
+              ['tel', 'TEL', true],
+              ['mobile', '携帯', false],
+              ['fax', 'FAX', false],
+              ['email', 'メール', true],
+              ['area', 'エリア', true],
+              ['address', '住所', false],
+              ['memo', '備考', false],
+            ].map(([name, label, required], index) => (
               <div key={index} className="flex flex-col">
                 <label className="text-white">
                   {label}
@@ -58,11 +103,17 @@ export default function RoutingFormPage() {
                 </label>
                 <input
                   type="text"
+                  name={name}
+                  value={formData[name as keyof FormData]}
+                  onChange={handleInputChange}
                   className="bg-white text-black p-2 rounded"
                   required={required}
                 />
               </div>
             ))}
+            <button type="submit" className="bg-yellow-200 text-purple-700 text-xl px-10 py-3 rounded-full shadow-md hover:bg-yellow-300 transition w-full mt-4">
+              登録
+            </button>
           </form>
         </div>
 
@@ -77,7 +128,7 @@ export default function RoutingFormPage() {
           {/* ロボット画像（右上） */}
           <div className="absolute -top-8 right-4">
             <Image
-              src="/robot.png" // 公開ディレクトリに配置
+              src="/robot.png"
               alt="ロボット"
               width={60}
               height={60}
@@ -85,13 +136,6 @@ export default function RoutingFormPage() {
           </div>
         </div>
       </main>
-
-      {/* 登録ボタン */}
-      <div className="flex justify-center mt-10">
-        <button className="bg-yellow-200 text-purple-700 text-xl px-10 py-3 rounded-full shadow-md hover:bg-yellow-300 transition">
-          登録
-        </button>
-      </div>
     </div>
   );
 }
