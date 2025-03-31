@@ -79,7 +79,7 @@ export default function RoutingFormPage() {
         <a href="/routing/kankei">関係機関一覧</a>
         <a href="/routing/kubun">区分一覧</a>
         <a href="/routing/area">エリア一覧</a>
-        <a href="/routing/logout">ログアウト</a>
+        <a href="/routing/login">ログイン</a>
         <a href="/routing/shinkitouroku">新規登録</a>
         </nav>
       </header>

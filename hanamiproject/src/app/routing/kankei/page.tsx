@@ -19,13 +19,13 @@ export default function CategoryListPage() {
       <header className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-bold text-purple-700">IT就労 ビズウェル</h1>
         <nav className="space-x-4 text-pink-600">
-          <a href="/">ホーム</a>
-          <a href="/routing/tanto">担当者一覧</a>
-          <a href="/routing/kankei">関係機関一覧</a>
-          <a href="/routing/kubun">区分一覧</a>
-          <a href="/routing/area">エリア一覧</a>
-          <a href="/routing/logout">ログアウト</a>
-          <a href="/routing/shinkitouroku">新規登録</a>
+        <a href="/">ホーム</a>
+        <a href="/routing/tanto">担当者一覧</a>
+        <a href="/routing/kankei">関係機関一覧</a>
+        <a href="/routing/kubun">区分一覧</a>
+        <a href="/routing/area">エリア一覧</a>
+        <a href="/routing/login">ログイン</a>
+        <a href="/routing/shinkitouroku">新規登録</a>
         </nav>
       </header>
 
