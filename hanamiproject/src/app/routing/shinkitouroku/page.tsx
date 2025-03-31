@@ -2,10 +2,9 @@
 
 import Image from 'next/image';
 import { useState } from 'react';
-
 import { twMerge } from "tailwind-merge";
-
 import { clsx } from "clsx";
+import { supabase } from '@/lib/supabaseClient';
 
 interface FormData {
   kubun: string;
@@ -42,10 +41,31 @@ export default function RoutingFormPage() {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    // ここにフォーム送信のロジックを実装
-    console.log('Form submitted:', formData);
+
+    // SupabaseにINSERT
+    const { error } = await supabase.from('contacts').insert([formData]);
+
+    if (error) {
+      console.error('Insert Error', error);
+      alert('登録に失敗しました');
+    } else {
+      alert('登録に成功しました');
+      // フォームの初期化
+      setFormData({
+        kubun: '',
+        kankei: '',
+        tanto: '',
+        tel: '',
+        mobile: '',
+        fax: '',
+        email: '',
+        area: '',
+        address: '',
+        memo: ''
+      });
+    }
   };
 
   return (
