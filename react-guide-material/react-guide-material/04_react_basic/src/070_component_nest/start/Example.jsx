@@ -1,11 +1,11 @@
-import "./Example.css";
+import Child from './components/Child..jsx'; 
 
 const Example = () => {
-  return (
-    <div className="component">
-      <h3>Hello Component</h3>
-    </div>
-  );
+  return ( 
+  <div>
+  <Child />
+  </div>
+  )
 };
 
 export default Example;
