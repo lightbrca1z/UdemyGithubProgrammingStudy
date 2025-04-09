@@ -1,212 +1,267 @@
 'use client';
 
-import Image from 'next/image';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLogout } from '@/lib/logout';
 import Link from 'next/link';
+import { supabase } from '@/lib/supabaseClient';
 
 interface FormData {
-  kubun: string;
-  kankei: string;
-  tanto: string;
-  tel: string;
+  category: string;        // ID
+  organization: string;    // ID
+  representative: string;  // ID
+  phone: string;
   mobile: string;
   fax: string;
   email: string;
-  area: string;
+  region: string;          // ID
   address: string;
-  memo: string;
+  notes: string;
 }
 
 export default function RoutingFormPage() {
   const [formData, setFormData] = useState<FormData>({
-    kubun: '',
-    kankei: '',
-    tanto: '',
-    tel: '',
+    category: '',
+    organization: '',
+    representative: '',
+    phone: '',
     mobile: '',
     fax: '',
     email: '',
-    area: '',
+    region: '',
     address: '',
-    memo: ''
+    notes: '',
   });
 
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { logout } = useLogout();
 
-  // 入力値変更
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
+  // ▼ マスター取得
+  const [categories, setCategories] = useState<any[]>([]);
+  const [organizations, setOrganizations] = useState<any[]>([]);
+  const [representatives, setRepresentatives] = useState<any[]>([]);
+  const [regions, setRegions] = useState<any[]>([]);
 
-  // 画像変更
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setImageFile(file);
-      setImagePreviewUrl(URL.createObjectURL(file)); // プレビュー用URL生成
+  useEffect(() => {
+    const fetchMasters = async () => {
+      const [cat, org, rep, reg] = await Promise.all([
+        supabase.from('category').select('*'),
+        supabase.from('organization').select('*'),
+        supabase.from('representative').select('*'),
+        supabase.from('region').select('*'),
+      ]);
+      if (cat.data) setCategories(cat.data);
+      if (org.data) setOrganizations(org.data);
+      if (rep.data) setRepresentatives(rep.data);
+      if (reg.data) setRegions(reg.data);
+    };
+    fetchMasters();
+  }, []);
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] || null;
+    setSelectedFile(file);
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => setPreviewUrl(reader.result as string);
+      reader.readAsDataURL(file);
+    } else {
+      setPreviewUrl(null);
     }
   };
 
-  // フォーム送信
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsSubmitting(true);
 
-    let imageUrl = '';
-
-    if (imageFile) {
-      const formDataImage = new FormData();
-      formDataImage.append('file', imageFile);
-
-      const uploadRes = await fetch('/api/upload', {
-        method: 'POST',
-        body: formDataImage,
-      });
-
-      if (uploadRes.ok) {
-        const data = await uploadRes.json();
-        imageUrl = data.imageUrl; // アップロード後の画像URL
-      } else {
-        alert('画像アップロードに失敗しました');
+    try {
+      // ① 必須チェック
+      const requiredFields = ['category', 'organization', 'representative', 'region'];
+      const missingFields = requiredFields.filter(key => !formData[key as keyof FormData]);
+      if (missingFields.length > 0) {
+        alert('必須項目が未選択です');
+        setIsSubmitting(false);
         return;
       }
-    }
 
-    const res = await fetch('/api/contact', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...formData, imageUrl }),
-    });
+      // ② マスターの登録処理
+      const upsertMaster = async (table: string, nameField: string, value: string) => {
+        // まず既存のレコードを検索
+        const { data: existingData, error: searchError } = await supabase
+          .from(table)
+          .select('*')
+          .eq(nameField, value)
+          .single();
 
-    if (res.ok) {
-      alert('登録に成功しました');
+        if (searchError && searchError.code !== 'PGRST116') { // PGRST116はレコードが見つからないエラー
+          throw searchError;
+        }
+
+        if (existingData) {
+          return existingData[`${table}id`]; // 例: categoryid, organizationid など
+        }
+
+        // 新規登録
+        const { data: newData, error: insertError } = await supabase
+          .from(table)
+          .insert([{ [nameField]: value }])
+          .select()
+          .single();
+
+        if (insertError) throw insertError;
+        return newData[`${table}id`]; // 例: categoryid, organizationid など
+      };
+
+      // ③ 各マスターのIDを取得
+      const categoryId = await upsertMaster('category', 'categoryname', formData.category);
+      const organizationId = await upsertMaster('organization', 'organizationname', formData.organization);
+      const representativeId = await upsertMaster('representative', 'representativename', formData.representative);
+      const regionId = await upsertMaster('region', 'regionname', formData.region);
+
+      // ④ 画像アップロード処理
+      let public_url: string | null = null;
+      if (selectedFile) {
+        const fileExt = selectedFile.name.split('.').pop() || 'png';
+        const fileName = `${Date.now()}.${fileExt}`;
+        const filePath = `uploads/${fileName}`;
+        const { error: uploadError } = await supabase.storage.from('images').upload(filePath, selectedFile);
+        if (uploadError) throw new Error(uploadError.message);
+
+        const { data: publicUrlData } = supabase.storage.from('images').getPublicUrl(filePath);
+        if (!publicUrlData?.publicUrl) throw new Error('画像URL取得失敗');
+        public_url = publicUrlData.publicUrl;
+      }
+
+      // ⑤ businesscard 登録
+      const { error: insertError } = await supabase.from('businesscard').insert([{
+        categoryid: categoryId,
+        organizationid: organizationId,
+        representativeid: representativeId,
+        regionid: regionId,
+        phone: formData.phone.trim(),
+        mobile: formData.mobile.trim(),
+        fax: formData.fax.trim(),
+        email: formData.email.trim(),
+        address: formData.address.trim(),
+        notes: formData.notes.trim(),
+        imageurl: public_url,
+      }]);
+
+      if (insertError) throw new Error(insertError.message);
+
+      alert('登録が完了しました');
       setFormData({
-        kubun: '',
-        kankei: '',
-        tanto: '',
-        tel: '',
+        category: '',
+        organization: '',
+        representative: '',
+        phone: '',
         mobile: '',
         fax: '',
         email: '',
-        area: '',
+        region: '',
         address: '',
-        memo: ''
+        notes: '',
       });
-      setImageFile(null);
-      setImagePreviewUrl(null);
-    } else {
-      const data = await res.json();
-      alert('登録に失敗しました');
+      setSelectedFile(null);
+      setPreviewUrl(null);
+
+    } catch (err: any) {
+      console.error('登録エラー', err);
+      alert(err.message || 'エラーが発生しました');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const { logout } = useLogout();
+  const renderSelectField = (
+    label: string,
+    field: keyof FormData,
+    options: any[],
+    optionLabelKey: string
+  ) => (
+    <div className="flex flex-col space-y-1 w-full">
+      <label className="text-sm">{label} <span className="text-red-500">※は必須項目です</span></label>
+      <select
+        className="bg-white text-black p-2 rounded border-2 border-purple-500 w-full"
+        value={formData[field]}
+        onChange={(e) => setFormData({ ...formData, [field]: e.target.value })}
+        required
+      >
+        <option value="">選択してください</option>
+        {options.map((opt) => (
+          <option key={opt.id} value={opt.id}>{opt[optionLabelKey]}</option>
+        ))}
+      </select>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-green-100 p-6 sm:p-12 font-sans">
-
-      {/* ヘッダー */}
-      <header className="w-full flex flex-col sm:flex-row justify-between items-center max-w-6xl mx-auto">
+      <header className="w-full flex flex-col sm:flex-row justify-between items-center max-w-6xl mx-auto mb-8">
         <div className="text-3xl font-bold text-purple-600">IT就労 ビズウェル</div>
         <nav className="flex space-x-4 text-pink-700 text-sm sm:text-base">
-          <a href="/">ホーム</a>
-          <a href="/routing/tanto">担当者一覧</a>
-          <a href="/routing/kankei">関係機関一覧</a>
-          <a href="/routing/kubun">区分一覧</a>
-          <a href="/routing/area">エリア一覧</a>
-          <a href="#" onClick={(e) => { e.preventDefault(); logout() }}>ログアウト</a>
-          <a href="/routing/shinkitouroku">新規登録</a>
+          <Link href="/">TOP</Link>
+          <Link href="/routing/tanto">担当者一覧</Link>
+          <Link href="/routing/kankei">関係機関一覧</Link>
+          <Link href="/routing/kubun">区分一覧</Link>
+          <Link href="/routing/area">エリア一覧</Link>
+          <Link href="#" onClick={(e) => { e.preventDefault(); logout() }}>ログアウト</Link>
         </nav>
       </header>
 
-      {/* 新規登録 & 検索 */}
-      <div className="mt-6 flex items-center justify-start max-w-6xl mx-auto space-x-4">
-        <button className="bg-yellow-200 text-gray-800 px-6 py-2 rounded-full shadow-md text-lg">
-          新規登録
-        </button>
-        <input
-          type="text"
-          placeholder="検索"
-          className="border rounded-full px-4 py-2 focus:outline-none"
-        />
-      </div>
+      <main className="flex flex-col lg:flex-row gap-8 max-w-6xl mx-auto">
+        <div className="bg-purple-900 text-white p-6 rounded-2xl w-full lg:w-2/3 shadow-lg">
+          <h2 className="bg-purple-400 text-center text-xl font-bold py-2 rounded-t-2xl mb-4">入力フォーム</h2>
+          <form onSubmit={handleSubmit} className="space-y-4 text-sm flex flex-col items-start w-full">
+            {renderSelectField('区分入力', 'category', categories, 'categoryname')}
+            {renderSelectField('関係機関名', 'organization', organizations, 'organizationname')}
+            {renderSelectField('担当者名', 'representative', representatives, 'representativename')}
+            {renderSelectField('エリア', 'region', regions, 'regionname')}
 
-      {/* メイン */}
-      <main className="mt-10 flex flex-col lg:flex-row gap-8 max-w-6xl mx-auto">
-
-        {/* フォーム */}
-        <div className="bg-purple-900 text-white p-6 rounded-xl w-full lg:w-2/3">
-          <h2 className="bg-purple-400 text-center text-xl font-bold py-2 rounded-t-xl mb-4">入力フォーム</h2>
-          <form onSubmit={handleSubmit} className="space-y-4 text-sm">
-            {[
-              ['kubun', '区分入力', true],
-              ['kankei', '関係機関名', true],
-              ['tanto', '担当者名', true],
-              ['tel', 'TEL', true],
-              ['mobile', '携帯', false],
-              ['fax', 'FAX', false],
-              ['email', 'メール', true],
-              ['area', 'エリア', true],
-              ['address', '住所', false],
-              ['memo', '備考', false],
-            ].map(([name, label, required], index) => (
-              <div key={index} className="flex flex-col">
-                <label className="text-white">
-                  {label}
-                  {required && (
-                    <span className="text-red-500 text-xs ml-1">※は必須項目です</span>
-                  )}
-                </label>
+            {[ 
+              { label: 'TEL', field: 'phone', required: true },
+              { label: '携帯', field: 'mobile', required: false },
+              { label: 'FAX', field: 'fax', required: false },
+              { label: 'メール', field: 'email', required: true },
+              { label: '住所', field: 'address', required: false },
+              { label: '備考', field: 'notes', required: false },
+            ].map(({ label, field, required }) => (
+              <div key={field} className="flex flex-col space-y-1 w-full">
+                <label>{label}{required && <span className="text-red-500">※は必須項目です</span>}</label>
                 <input
-                  type="text"
-                  name={name}
-                  value={formData[name as keyof FormData]}
-                  onChange={handleInputChange}
-                  className="bg-white text-black p-2 rounded"
+                  type={field === 'email' ? 'email' : 'text'}
+                  className="bg-white text-black p-2 rounded border-2 border-purple-500 w-full"
+                  placeholder={label}
                   required={required}
+                  value={formData[field as keyof FormData]}
+                  onChange={(e) => setFormData({ ...formData, [field]: e.target.value })}
                 />
               </div>
             ))}
 
-            <button type="submit" className="bg-yellow-200 text-purple-700 text-xl px-10 py-3 rounded-full shadow-md hover:bg-yellow-300 transition w-full mt-4">
-              登録
+            <button type="submit" disabled={isSubmitting}
+              className="bg-yellow-200 text-purple-700 text-xl px-10 py-3 rounded-full shadow-md hover:bg-yellow-300 transition w-full">
+              {isSubmitting ? '登録中...' : '登録'}
             </button>
           </form>
         </div>
 
-        {/* 画像エリア */}
-        <div className="bg-purple-200 p-6 rounded-xl w-full lg:w-1/3 relative">
-          <h2 className="bg-purple-400 text-center text-xl font-bold py-2 rounded-t-xl mb-4">画像登録</h2>
+        <div className="bg-purple-200 p-6 rounded-2xl w-full lg:w-1/3 shadow-lg relative">
+          <h2 className="bg-purple-400 text-center text-xl font-bold py-2 rounded-t-2xl mb-4">画像登録</h2>
           <p className="text-center mb-4">名刺の画像から登録</p>
-          <div className="border border-gray-400 bg-white text-center py-10 rounded relative cursor-pointer mb-4">
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleImageChange}
-              className="absolute inset-0 opacity-0 cursor-pointer"
-              title=""
-            />
+          <div className="border-2 border-purple-400 bg-white text-center py-10 rounded relative cursor-pointer mb-4">
+            <input type="file" accept="image/*" onChange={handleFileChange} className="absolute inset-0 opacity-0 cursor-pointer" />
             <span className="text-black pointer-events-none">ファイルを選択してください</span>
           </div>
-
-          {/* 選択された画像のURL表示とプレビュー */}
-          {imagePreviewUrl && (
-            <div className="text-center text-sm text-purple-900 break-all space-y-2">
+          {previewUrl && (
+            <div className="text-center text-sm text-purple-900 break-words space-y-2">
               <p>選択中の画像:</p>
-              <a href={imagePreviewUrl} target="_blank" rel="noopener noreferrer" className="underline break-words">
-                {imagePreviewUrl}
-              </a>
-              <img src={imagePreviewUrl} alt="プレビュー" className="mx-auto max-h-40 rounded shadow" />
+              <img src={previewUrl} alt="プレビュー" className="mx-auto max-h-40 rounded shadow" />
+              <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="underline break-words">{previewUrl}</a>
             </div>
           )}
-
         </div>
-
       </main>
     </div>
   );
