@@ -134,21 +134,57 @@ export default function RoutingFormPage() {
       }
 
       // ⑤ businesscard 登録
-      const { error: insertError } = await supabase.from('businesscard').insert([{
-        categoryid: categoryId,
-        organizationid: organizationId,
-        representativeid: representativeId,
-        regionid: regionId,
-        phone: formData.phone.trim(),
-        mobile: formData.mobile.trim(),
-        fax: formData.fax.trim(),
-        email: formData.email.trim(),
-        address: formData.address.trim(),
-        notes: formData.notes.trim(),
-        imageurl: public_url,
-      }]);
+      // まず既存のレコードをチェック
+      const { data: existingCard, error: checkError } = await supabase
+        .from('businesscard')
+        .select('*')
+        .eq('email', formData.email.trim())
+        .single();
 
-      if (insertError) throw new Error(insertError.message);
+      if (checkError && checkError.code !== 'PGRST116') { // PGRST116はレコードが見つからないエラー
+        throw checkError;
+      }
+
+      let result;
+      if (existingCard) {
+        // 既存のレコードを更新
+        const { error: updateError } = await supabase
+          .from('businesscard')
+          .update({
+            categoryid: categoryId,
+            organizationid: organizationId,
+            representativeid: representativeId,
+            regionid: regionId,
+            phone: formData.phone.trim(),
+            mobile: formData.mobile.trim(),
+            fax: formData.fax.trim(),
+            address: formData.address.trim(),
+            notes: formData.notes.trim(),
+            imageurl: public_url,
+          })
+          .eq('email', formData.email.trim());
+
+        if (updateError) throw new Error(updateError.message);
+      } else {
+        // 新規レコードを作成
+        const { error: insertError } = await supabase
+          .from('businesscard')
+          .insert([{
+            categoryid: categoryId,
+            organizationid: organizationId,
+            representativeid: representativeId,
+            regionid: regionId,
+            phone: formData.phone.trim(),
+            mobile: formData.mobile.trim(),
+            fax: formData.fax.trim(),
+            email: formData.email.trim(),
+            address: formData.address.trim(),
+            notes: formData.notes.trim(),
+            imageurl: public_url,
+          }]);
+
+        if (insertError) throw new Error(insertError.message);
+      }
 
       alert('登録が完了しました');
       setFormData({
@@ -258,7 +294,7 @@ export default function RoutingFormPage() {
             <div className="text-center text-sm text-purple-900 break-words space-y-2">
               <p>選択中の画像:</p>
               <img src={previewUrl} alt="プレビュー" className="mx-auto max-h-40 rounded shadow" />
-              <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="underline break-words">{previewUrl}</a>
+              {/* <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="underline break-words">{previewUrl}</a> */}
             </div>
           )}
         </div>
